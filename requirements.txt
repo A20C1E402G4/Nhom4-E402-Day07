@@ -13,3 +13,16 @@ python-dotenv>=1.0
 
 # Optional: for bonus tasks
 # chromadb>=0.4.0      # Real vector database integration
+
+# ── Phase 2: LangChain + Pinecone ──────────────────────────────────────────
+# Install all Phase 2 dependencies with:
+#   pip install langchain-text-splitters langchain-huggingface sentence-transformers pinecone langchain-pinecone
+#
+# For OpenAI embeddings (optional, needs OPENAI_API_KEY):
+#   pip install langchain-openai
+#
+# langchain-text-splitters>=0.3   # MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+# langchain-huggingface>=0.1      # HuggingFaceEmbeddings (backed by sentence-transformers)
+# langchain-openai>=0.2           # OpenAIEmbeddings (optional, needs OPENAI_API_KEY)
+# langchain-pinecone>=0.2         # LangChain-Pinecone integration (optional)
+# pinecone>=5.0                   # Pinecone Python SDK v3+

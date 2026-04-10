@@ -4,7 +4,10 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "chromadb>=0.4.0",
+    "langchain-huggingface>=1.2.1",
+    "langchain-text-splitters>=1.1.1",
     "openai>=1.0",
+    "pinecone>=8.1.2",
     "pytest>=7.0",
     "python-dotenv>=1.0",
     "sentence-transformers>=3.0",
