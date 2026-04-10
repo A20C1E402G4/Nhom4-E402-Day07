@@ -58,27 +58,30 @@
 
 ### Domain & Lý Do Chọn
 
-**Domain:** [ví dụ: Customer support FAQ, Vietnamese law, cooking recipes, ...]
+**Domain:** Machine Learning (CS229 Lecture Notes — Andrew Ng)
 
 **Tại sao nhóm chọn domain này?**
-> *Viết 2-3 câu:*
+> Tài liệu CS229 của Andrew Ng là nội dung học thuật có cấu trúc rõ ràng theo header (##, ###, ####),
+> giúp kiểm chứng chiến lược chunking dựa trên ranh giới ngữ nghĩa. Domain ML có nhiều khái niệm kỹ thuật
+> (gradient descent, logistic regression, SVM...) đòi hỏi chunk phải giữ đủ context để retrieval có nghĩa —
+> đây là bài test tốt cho cả hai strategy.
 
 ### Data Inventory
 
-| # | Tên tài liệu | Nguồn | Số ký tự | Metadata đã gán |
-|---|--------------|-------|----------|-----------------|
-| 1 |              |       |          |                 |
-| 2 |              |       |          |                 |
-| 3 |              |       |          |                 |
-| 4 |              |       |          |                 |
-| 5 |              |       |          |                 |
+| # | Tên tài liệu        | Nguồn                    | Số ký tự | Metadata đã gán                    |
+|---|---------------------|--------------------------|----------|------------------------------------|
+| 1 | machine_learning.md | CS229 Lecture Notes (Ng) | 35,774   | topic, section, subsection, source |
 
 ### Metadata Schema
 
-| Trường metadata | Kiểu | Ví dụ giá trị | Tại sao hữu ích cho retrieval? |
-|-----------------|------|---------------|--------------------------------|
-|                 |      |               |                                |
-|                 |      |               |                                |
+| Trường metadata | Kiểu   | Ví dụ giá trị                | Tại sao hữu ích cho retrieval?                                           |
+|-----------------|--------|------------------------------|--------------------------------------------------------------------------|
+| `topic`         | string | `"CS229 Lecture notes"`      | Identify top-level document; useful if multiple docs are in same index   |
+| `section`       | string | `"Supervised learning"`      | Filter by major section (e.g. only retrieve from Part II classification) |
+| `subsection`    | string | `"Part I Linear Regression"` | Narrow to specific algorithm section                                     |
+| `subsubsection` | string | `"1 LMS algorithm"`          | Most granular header — pinpoints exact algorithm discussion              |
+| `source`        | string | `"machine_learning"`         | Identifies original file; supports multi-document indexes                |
+| `strategy`      | string | `"markdown_header"`          | Tracks which chunking strategy produced this chunk (for A/B analysis)    |
 
 ---
 
@@ -86,47 +89,60 @@
 
 ### Baseline Analysis
 
-Chạy `ChunkingStrategyComparator().compare()` trên 2-3 tài liệu:
+Chạy `ChunkingStrategyComparator().compare()` trên `machine_learning.md` (chunk_size=200):
 
-| Tài liệu | Strategy                         | Chunk Count | Avg Length | Preserves Context? |
-|----------|----------------------------------|-------------|------------|--------------------|
-|          | FixedSizeChunker (`fixed_size`)  |             |            |                    |
-|          | SentenceChunker (`by_sentences`) |             |            |                    |
-|          | RecursiveChunker (`recursive`)   |             |            |                    |
+| Tài liệu            | Strategy                         | Chunk Count | Avg Length | Preserves Context?      |
+|---------------------|----------------------------------|-------------|------------|-------------------------|
+| machine_learning.md | FixedSizeChunker (`fixed_size`)  | 207         | 195 chars  | Partial — cắt giữa câu  |
+| machine_learning.md | SentenceChunker (`by_sentences`) | 180         | 200 chars  | Tốt — giữ ranh giới câu |
+| machine_learning.md | RecursiveChunker (`recursive`)   | 166         | 211 chars  | Tốt — ưu tiên \n\n      |
 
-### Strategy Của Tôi
+### Strategy Của Tôi (Phase 2)
 
-**Loại:** [FixedSizeChunker / SentenceChunker / RecursiveChunker / custom strategy]
+**Loại:** LangChain `MarkdownHeaderTextSplitter` + `RecursiveCharacterTextSplitter` (custom strategy)
 
 **Mô tả cách hoạt động:**
-> *Viết 3-4 câu: strategy chunk thế nào? Dựa trên dấu hiệu gì?*
+> Bước 1: `MarkdownHeaderTextSplitter` tách tài liệu tại các header `#`, `##`, `###`, `####`, lưu tên header
+> vào metadata (`topic`, `section`, `subsection`, `subsubsection`). Mỗi section được giữ nguyên vẹn như một
+> đơn vị ngữ nghĩa. Bước 2: `RecursiveCharacterTextSplitter` (chunk_size=500, overlap=50) sub-split những
+> section dài, đảm bảo không có chunk nào vượt ngưỡng kích thước. Kết quả: 87 chunks trên machine_learning.md,
+> avg length ~417 chars, mỗi chunk đều có metadata section để filter.
 
 **Tại sao tôi chọn strategy này cho domain nhóm?**
-> *Viết 2-3 câu: domain có pattern gì mà strategy khai thác?*
+> CS229 có cấu trúc header rõ ràng: mỗi section (LMS algorithm, Normal equations, Logistic regression...)
+> là một khái niệm ML độc lập. Chunking theo header giữ toàn bộ phần giải thích của một khái niệm trong cùng
+> chunk, giúp retrieval luôn trả về context đầy đủ thay vì nửa chừng một công thức hay giải thích.
 
-**Code snippet (nếu custom):**
+**Code snippet:**
 
 ```python
-# Paste implementation here
+# src/langchain_chunking.py
+from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+
+chunker = LangChainMarkdownChunker(chunk_size=500, chunk_overlap=50)
+docs = chunker.chunk(text, source="machine_learning")
+# Returns Document objects with metadata: {topic, section, subsection, source, strategy}
 ```
 
 ### So Sánh: Strategy của tôi vs Baseline
 
-| Tài liệu | Strategy      | Chunk Count | Avg Length | Retrieval Quality? |
-|----------|---------------|-------------|------------|--------------------|
-|          | best baseline |             |            |                    |
-|          | **của tôi**   |             |            |                    |
+| Tài liệu            | Strategy                    | Chunk Count | Avg Length | Top-1 Score (Q1) |
+|---------------------|-----------------------------|-------------|------------|------------------|
+| machine_learning.md | RecursiveChunker (baseline) | 106         | 339 chars  | 0.801            |
+| machine_learning.md | **Markdown Header (tôi)**   | 87          | 417 chars  | **0.809**        |
 
 ### So Sánh Với Thành Viên Khác
 
-| Thành viên | Strategy | Retrieval Score (/10) | Điểm mạnh | Điểm yếu |
-|------------|----------|-----------------------|-----------|----------|
-| Tôi        |          |                       |           |          |
-| [Tên]      |          |                       |           |          |
-| [Tên]      |          |                       |           |          |
+| Thành viên  | Strategy             | Avg Top-1 Score | Điểm mạnh                              | Điểm yếu                            |
+|-------------|----------------------|-----------------|----------------------------------------|-------------------------------------|
+| Tôi         | Markdown Header (LC) | 0.823           | Section metadata, higher avg score     | Ít chunks hơn, bỏ sót cross-section |
+| (nhóm khác) | LC Recursive         | 0.811           | Granular chunks, overlap giúp boundary | Không có section metadata           |
 
 **Strategy nào tốt nhất cho domain này? Tại sao?**
-> *Viết 2-3 câu:*
+> Markdown Header chunking tốt hơn trên 4/5 queries vì CS229 có cấu trúc header học thuật rõ ràng — mỗi
+> section tự nhiên là một đơn vị ngữ nghĩa hoàn chỉnh. Strategy B (LC Recursive) thắng ở query về LWLR vì
+> câu trả lời liên quan nằm rải rác ở 3 đoạn khác nhau trong cùng section, nên chunk nhỏ hơn + overlap lại
+> bắt được ranh giới tốt hơn trong trường hợp đó.
 
 ---
 
@@ -267,16 +283,22 @@ tests/test_solution.py::TestEmbeddingStoreDeleteDocument::test_delete_returns_tr
 
 ## 5. Similarity Predictions - Cá nhân (5 điểm)
 
-| Pair | Sentence A | Sentence B | Dự đoán    | Actual Score | Đúng? |
-|------|------------|------------|------------|--------------|-------|
-| 1    |            |            | high / low |              |       |
-| 2    |            |            | high / low |              |       |
-| 3    |            |            | high / low |              |       |
-| 4    |            |            | high / low |              |       |
-| 5    |            |            | high / low |              |       |
+Dùng `LocalEmbedder` (all-MiniLM-L6-v2) + `compute_similarity()`:
+
+| Pair | Sentence A                                           | Sentence B                                         | Dự đoán | Actual Score | Đúng?                           |
+|------|------------------------------------------------------|----------------------------------------------------|---------|--------------|---------------------------------|
+| 1    | "Gradient descent minimizes the cost function."      | "We update theta to reduce J(theta)."              | high    | 0.721        | Yes                             |
+| 2    | "Logistic regression uses the sigmoid function."     | "The sigmoid maps real numbers to (0,1)."          | high    | 0.812        | Yes                             |
+| 3    | "Linear regression fits a line to data."             | "The Amazon rainforest has millions of species."   | low     | 0.041        | Yes                             |
+| 4    | "The normal equation solves for theta analytically." | "Gradient descent is an iterative optimization."   | medium  | 0.523        | Surprise — higher than expected |
+| 5    | "Overfitting occurs when a model is too complex."    | "Regularization penalizes large parameter values." | high    | 0.674        | Yes                             |
 
 **Kết quả nào bất ngờ nhất? Điều này nói gì về cách embeddings biểu diễn nghĩa?**
-> *Viết 2-3 câu:*
+> Pair 4 bất ngờ nhất: "normal equation" và "gradient descent" đều là phương pháp tối ưu hóa cho linear
+> regression, nên embedding model nhận ra chúng cùng semantic cluster (score=0.523 — medium-high) dù surface
+> form hoàn toàn khác nhau. Điều này cho thấy embeddings biểu diễn khái niệm và chức năng, không chỉ từ
+> khoá. Ngược lại, Pair 1 thấp hơn Pair 2 vì "gradient descent" + "cost function" là một phát biểu cụ thể
+> hơn, trong khi Pair 2 (sigmoid definition) là quan hệ định nghĩa trực tiếp nên score cao hơn.
 
 ---
 
@@ -287,38 +309,53 @@ các thành viên cùng nhóm.**
 
 ### Benchmark Queries & Gold Answers (nhóm thống nhất)
 
-| # | Query | Gold Answer |
-|---|-------|-------------|
-| 1 |       |             |
-| 2 |       |             |
-| 3 |       |             |
-| 4 |       |             |
-| 5 |       |             |
+| # | Query                                                                               | Gold Answer                                                                                       |
+|---|-------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| 1 | What is gradient descent and how does it minimize the cost function?                | θ_j := θ_j − α * ∂J/∂θ_j, iteratively steps in direction of steepest decrease of J(θ)             |
+| 2 | What is the cost function used in linear regression?                                | J(θ) = ½ Σ (h_θ(x^(i)) − y^(i))², the least-squares cost function                                 |
+| 3 | How does logistic regression handle classification problems?                        | Uses sigmoid g(z)=1/(1+e^−z) to output P(y=1\|x); maximize log-likelihood via gradient ascent     |
+| 4 | What is the normal equation and when is it used instead of gradient descent?        | θ = (X^T X)^−1 X^T y; used when n is small enough to invert X^T X analytically                    |
+| 5 | What is locally weighted linear regression and how does it differ from standard LR? | LWLR weights training examples by w^(i)=exp(−(x^(i)−x)²/2τ²); non-parametric, re-trains per query |
 
-### Kết Quả Của Tôi
+### Kết Quả Của Tôi (Strategy A — Markdown Header, Pinecone + BAAI/bge-large-en-v1.5)
 
-| # | Query | Top-1 Retrieved Chunk (tóm tắt) | Score | Relevant? | Agent Answer (tóm tắt) |
-|---|-------|---------------------------------|-------|-----------|------------------------|
-| 1 |       |                                 |       |           |                        |
-| 2 |       |                                 |       |           |                        |
-| 3 |       |                                 |       |           |                        |
-| 4 |       |                                 |       |           |                        |
-| 5 |       |                                 |       |           |                        |
+| # | Query                              | Top-1 Retrieved Chunk (tóm tắt)                                                           | Score | Relevant? | Agent Answer (tóm tắt)      |
+|---|------------------------------------|-------------------------------------------------------------------------------------------|-------|-----------|-----------------------------|
+| 1 | Gradient descent & cost function   | "...gradient descent on the original cost function J..." (section: Supervised learning)   | 0.809 | Yes       | LMS update rule explanation |
+| 2 | Cost function in linear regression | "...how close the h(x^(i))'s are to y^(i)'s. We define..." (section: Supervised learning) | 0.828 | Yes       | J(θ)=½Σ(hθ−y)² definition   |
+| 3 | Logistic regression classification | "Part II Classification and logistic regression..." (section: Supervised learning)        | 0.827 | Yes       | sigmoid function + MLE      |
+| 4 | Normal equation                    | "Normal equations — Gradient descent gives one way..." (section: Supervised learning)     | 0.830 | Yes       | θ=(X^TX)^−1 X^Ty formula    |
+| 5 | LWLR vs standard LR                | "...properties of the LWR algorithm..." (section: Supervised learning)                    | 0.819 | Yes       | Weighting + non-parametric  |
 
-**Bao nhiêu queries trả về chunk relevant trong top-3?** __ / 5
+**Bao nhiêu queries trả về chunk relevant trong top-3?** 5 / 5
 
 ---
 
 ## 7. What I Learned (5 điểm - Demo)
 
 **Điều hay nhất tôi học được từ thành viên khác trong nhóm:**
-> *Viết 2-3 câu:*
+> So sánh trực tiếp kết quả A/B trên cùng bộ queries cho thấy chunking strategy ảnh hưởng đáng kể đến
+> retrieval score — cùng embedder, cùng index nhưng strategy khác nhau có thể chênh 0.05–0.06 cosine score
+> trên một query. Đặc biệt, thành viên dùng chunk nhỏ hơn (300 chars) cho top-3 đa dạng hơn, trong khi
+> chunk lớn hơn của tôi cho top-1 score cao hơn nhưng top-3 ít phủ rộng hơn.
 
 **Điều hay nhất tôi học được từ nhóm khác (qua demo):**
-> *Viết 2-3 câu:*
+> Nhóm khác dùng metadata `difficulty` (easy/medium/hard) để filter câu hỏi theo độ khó — rất hữu ích cho
+> FAQ domain nhưng khó áp dụng cho tài liệu học thuật. Điều này nhắc nhở rằng metadata schema phải được
+> thiết kế dựa trên query patterns thực tế, không phải chỉ dựa trên cấu trúc tài liệu.
 
 **Nếu làm lại, tôi sẽ thay đổi gì trong data strategy?**
-> *Viết 2-3 câu:*
+
+**Failure case:** Query "What is the normal equation?" với strategy B (LC Recursive) trả về top-1 là
+chunk chỉ chứa header `"#### 2 The normal equations"` (score=0.790) mà không có nội dung — chunk quá nhỏ
+do split tại `\n\n` ngay sau header. Strategy A không gặp lỗi này vì MarkdownHeaderTextSplitter merge header
+vào content của section. **Cải thiện:** Thêm `strip_headers=False` + min_chunk_size filter để loại bỏ
+chunk chỉ có header không có body.
+
+> Nếu làm lại, tôi sẽ tăng chunk_overlap từ 50 lên 100 để giảm mất thông tin tại ranh giới, và thêm
+> trường metadata `algorithm` (ví dụ: "gradient_descent", "logistic_regression") để support filtered search
+> theo thuật toán. Ngoài ra, tôi sẽ thử thêm một strategy kết hợp: dùng header để xác định section boundary,
+> sau đó dùng sentence-level chunking bên trong mỗi section thay vì character-level.
 
 ---
 
