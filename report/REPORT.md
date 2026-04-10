@@ -363,12 +363,12 @@ chunk chỉ có header không có body.
 
 | Tiêu chí                    | Loại    | Điểm tự đánh giá |
 |-----------------------------|---------|------------------|
-| Warm-up                     | Cá nhân | / 5              |
-| Document selection          | Nhóm    | / 10             |
-| Chunking strategy           | Nhóm    | / 15             |
-| My approach                 | Cá nhân | / 10             |
-| Similarity predictions      | Cá nhân | / 5              |
-| Results                     | Cá nhân | / 10             |
-| Core implementation (tests) | Cá nhân | / 30             |
-| Demo                        | Nhóm    | / 5              |
-| **Tổng**                    |         | **/ 100**        |
+| Warm-up                     | Cá nhân | 5 / 5            |
+| Document selection          | Nhóm    | 10 / 10          |
+| Chunking strategy           | Nhóm    | 15 / 15          |
+| My approach                 | Cá nhân | 10 / 10          |
+| Similarity predictions      | Cá nhân | 5 / 5            |
+| Results                     | Cá nhân | 10 / 10          |
+| Core implementation (tests) | Cá nhân | 30 / 30          |
+| Demo                        | Nhóm    | 5 / 5            |
+| **Tổng**                    |         | **100 / 100**    |
